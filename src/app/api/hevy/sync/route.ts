@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { fetchAllHevyWorkouts, isHevyConfigured } from "@/lib/hevy";
-import { upsertWorkouts } from "@/lib/db";
+import { fetchAllHevyWorkouts, fetchAllHevyWeightLog, isHevyConfigured } from "@/lib/hevy";
+import { upsertWorkouts, upsertWeightEntry } from "@/lib/db";
 
 export async function POST() {
   if (!isHevyConfigured()) {
@@ -11,5 +11,13 @@ export async function POST() {
     return NextResponse.json({ error: "Sync failed." }, { status: 502 });
   }
   await upsertWorkouts(workouts);
-  return NextResponse.json({ synced: workouts.length });
+
+  const weightLog = await fetchAllHevyWeightLog();
+  if (weightLog) {
+    for (const entry of weightLog) {
+      await upsertWeightEntry(entry);
+    }
+  }
+
+  return NextResponse.json({ synced: workouts.length, weightSynced: weightLog?.length ?? 0 });
 }

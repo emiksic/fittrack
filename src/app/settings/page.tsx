@@ -58,7 +58,9 @@ export default function SettingsPage() {
     setSyncMessage(null);
     const res = await fetch("/api/hevy/sync", { method: "POST" });
     const data = await res.json();
-    setSyncMessage(res.ok ? `Hevy: synced ${data.synced} workouts.` : `Hevy sync failed: ${data.error}`);
+    setSyncMessage(
+      res.ok ? `Hevy: synced ${data.synced} workouts, ${data.weightSynced} weight entries.` : `Hevy sync failed: ${data.error}`
+    );
     await refreshIntegrations();
     setSyncingHevy(false);
   };

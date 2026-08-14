@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import type {
   Meal,
   Workout,
@@ -44,6 +45,7 @@ const DEFAULT_INTEGRATIONS: IntegrationStatus = {
 const FitnessDataContext = createContext<FitnessData | null>(null);
 
 export function FitnessDataProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [meals, setMeals] = useState<Meal[]>([]);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
@@ -55,6 +57,7 @@ export function FitnessDataProvider({ children }: { children: ReactNode }) {
   const [integrations, setIntegrations] = useState<IntegrationStatus>(DEFAULT_INTEGRATIONS);
 
   useEffect(() => {
+    if (pathname === "/login") return;
     let cancelled = false;
     (async () => {
       const [mealsRes, settingsRes, weightRes, workoutsRes, runsRes, integrationsRes] = await Promise.all([
@@ -130,16 +133,18 @@ export function FitnessDataProvider({ children }: { children: ReactNode }) {
   }, [settings.weightKg]);
 
   const refreshIntegrations = useCallback(async () => {
-    const [integrationsRes, runsRes, workoutsRes] = await Promise.all([
+    const [integrationsRes, runsRes, workoutsRes, weightRes] = await Promise.all([
       fetch("/api/integrations/status").then((r) => r.json()),
       fetch("/api/runs").then((r) => r.json()),
       fetch("/api/workouts").then((r) => r.json()),
+      fetch("/api/weight").then((r) => r.json()),
     ]);
     setIntegrations(integrationsRes);
     setRuns(runsRes.runs);
     setRunsSource(runsRes.source);
     setWorkouts(workoutsRes.workouts);
     setWorkoutsSource(workoutsRes.source);
+    setWeightLog(weightRes.weightLog);
   }, []);
 
   const value = useMemo<FitnessData>(

@@ -36,13 +36,14 @@ export default function DashboardPage() {
   const handleSync = async () => {
     setSyncing(true);
     setSyncMsg(null);
-    const tasks: Promise<{ synced?: number; error?: string }>[] = [];
+    const tasks: Promise<{ synced?: number; weightSynced?: number; error?: string }>[] = [];
     if (integrations.strava.connected) tasks.push(fetch("/api/strava/sync", { method: "POST" }).then((r) => r.json()));
     if (integrations.hevy.configured) tasks.push(fetch("/api/hevy/sync", { method: "POST" }).then((r) => r.json()));
     const results = await Promise.all(tasks);
     await refreshIntegrations();
     const total = results.reduce((a, r) => a + (r.synced ?? 0), 0);
-    setSyncMsg(`Synced ${total} activities.`);
+    const weightTotal = results.reduce((a, r) => a + (r.weightSynced ?? 0), 0);
+    setSyncMsg(`Synced ${total} activities${weightTotal ? `, ${weightTotal} weight entries` : ""}.`);
     setSyncing(false);
   };
 

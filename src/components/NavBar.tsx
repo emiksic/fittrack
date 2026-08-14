@@ -15,6 +15,13 @@ const NAV_ITEMS = [
 export default function NavBar() {
   const pathname = usePathname();
 
+  if (pathname === "/login") return null;
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  };
+
   return (
     <div
       style={{
@@ -70,6 +77,19 @@ export default function NavBar() {
               </Link>
             );
           })}
+          <div
+            onClick={handleLogout}
+            style={{
+              padding: "8px 14px",
+              borderRadius: 9,
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: "pointer",
+              color: "#9a9a9a",
+            }}
+          >
+            Log out
+          </div>
         </div>
       </div>
     </div>

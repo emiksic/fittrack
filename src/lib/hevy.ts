@@ -1,4 +1,4 @@
-import type { Workout, WorkoutExercise } from "./types";
+import type { Workout, WorkoutExercise, WeightEntry } from "./types";
 
 const HEVY_BASE_URL = "https://api.hevyapp.com/v1";
 
@@ -116,6 +116,50 @@ export async function fetchAllHevyWorkouts(): Promise<Workout[] | null> {
     return all;
   } catch (err) {
     console.error("Hevy full sync failed", err);
+    return null;
+  }
+}
+
+type HevyApiBodyMeasurement = {
+  date: string; // yyyy-mm-dd
+  weight_kg?: number | null;
+};
+
+type HevyApiBodyMeasurementsResponse = {
+  page: number;
+  page_count: number;
+  body_measurements: HevyApiBodyMeasurement[];
+};
+
+// Paginates through the full body-measurement history and returns every
+// entry that has a bodyweight logged (Hevy also stores other measurements
+// like waist/chest that we don't use here).
+export async function fetchAllHevyWeightLog(): Promise<WeightEntry[] | null> {
+  const apiKey = process.env.HEVY_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const pageSize = 10; // Hevy API max page size
+    const all: WeightEntry[] = [];
+    for (let page = 1; ; page++) {
+      const res = await fetch(`${HEVY_BASE_URL}/body_measurements?page=${page}&pageSize=${pageSize}`, {
+        headers: { "api-key": apiKey },
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        console.error("Hevy API error", res.status, await res.text());
+        break;
+      }
+      const data = (await res.json()) as HevyApiBodyMeasurementsResponse;
+      if (data.body_measurements.length === 0) break;
+      for (const m of data.body_measurements) {
+        if (m.weight_kg != null) all.push({ date: m.date, weightKg: m.weight_kg });
+      }
+      if (page >= data.page_count) break;
+    }
+    return all;
+  } catch (err) {
+    console.error("Hevy weight sync failed", err);
     return null;
   }
 }

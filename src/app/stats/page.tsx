@@ -5,6 +5,7 @@ import { useFitnessData } from "@/context/FitnessDataContext";
 import { COLORS, FONT_DISPLAY, MACRO_COLORS } from "@/lib/theme";
 import { buildLinePath, computeGoals, estimateRunCalories, fmtShort, macroPct, offsetDate, paceLabel, round, sum, weightTrendChart } from "@/lib/calc";
 import MacroBar from "@/components/MacroBar";
+import ChartPoints from "@/components/ChartPoints";
 
 const cardStyle: React.CSSProperties = {
   background: COLORS.cardBg,
@@ -21,6 +22,8 @@ export default function StatsPage() {
   const goals = computeGoals(settings);
   const rangeDates: string[] = [];
   for (let i = range - 1; i >= 0; i--) rangeDates.push(offsetDate(i));
+
+  const rangeDateLabels = rangeDates.map(fmtShort);
 
   const dailyCals = rangeDates.map((d) => sum(meals.filter((m) => m.date === d), "calories"));
   const calChartRaw = buildLinePath(dailyCals, 640, 190, 10, 20);
@@ -40,6 +43,7 @@ export default function StatsPage() {
 
   const rangeWeights = weightLog.filter((w) => rangeDates.includes(w.date)).sort((a, b) => a.date.localeCompare(b.date));
   const weightChart = weightTrendChart(rangeWeights);
+  const weightDateLabels = rangeWeights.map((w) => fmtShort(w.date));
 
   const rangeRuns = runs.filter((r) => rangeDates.includes(r.date));
   const totalDistance = round(sum(rangeRuns, "distanceKm") * 10) / 10;
@@ -69,9 +73,13 @@ export default function StatsPage() {
         <svg viewBox="0 0 640 190" style={{ width: "100%", height: 190, overflow: "visible" }}>
           <line x1={0} y1={goalY} x2={640} y2={goalY} stroke="#3b3b3b" strokeWidth={1} strokeDasharray="4 4" />
           <path d={calChartRaw.path} fill="none" stroke={COLORS.accent} strokeWidth={2.5} />
-          {calChartRaw.points.map((p, i) => (
-            <circle key={i} cx={p.x} cy={p.y} r={3.5} fill={COLORS.accent} />
-          ))}
+          <ChartPoints
+            points={calChartRaw.points}
+            labels={rangeDateLabels}
+            viewBoxWidth={640}
+            color={COLORS.accent}
+            formatValue={(v) => `${v} kcal`}
+          />
         </svg>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: COLORS.textDim, marginTop: 6 }}>
           <span>{fmtShort(rangeDates[0])}</span>
@@ -96,9 +104,13 @@ export default function StatsPage() {
             <>
               <svg viewBox="0 0 280 140" style={{ width: "100%", height: 140, overflow: "visible" }}>
                 <path d={weightChart.path} fill="none" stroke={COLORS.green} strokeWidth={2.5} />
-                {weightChart.points.map((p, i) => (
-                  <circle key={i} cx={p.x} cy={p.y} r={3.5} fill={COLORS.green} />
-                ))}
+                <ChartPoints
+                  points={weightChart.points}
+                  labels={weightDateLabels}
+                  viewBoxWidth={280}
+                  color={COLORS.green}
+                  formatValue={(v) => `${v} kg`}
+                />
               </svg>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: COLORS.textDim, marginTop: 6 }}>
                 <span>{weightChart.firstLabel}</span>
@@ -126,9 +138,13 @@ export default function StatsPage() {
           <>
             <svg viewBox="0 0 640 190" style={{ width: "100%", height: 190, overflow: "visible" }}>
               <path d={distanceChart.path} fill="none" stroke={COLORS.amber} strokeWidth={2.5} />
-              {distanceChart.points.map((p, i) => (
-                <circle key={i} cx={p.x} cy={p.y} r={3.5} fill={COLORS.amber} />
-              ))}
+              <ChartPoints
+                points={distanceChart.points}
+                labels={rangeDateLabels}
+                viewBoxWidth={640}
+                color={COLORS.amber}
+                formatValue={(v) => `${round(v * 10) / 10} km`}
+              />
             </svg>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: COLORS.textDim, marginTop: 6 }}>
               <span>{fmtShort(rangeDates[0])}</span>
@@ -157,9 +173,13 @@ export default function StatsPage() {
           <>
             <svg viewBox="0 0 640 190" style={{ width: "100%", height: 190, overflow: "visible" }}>
               <path d={workoutChart.path} fill="none" stroke={COLORS.accent} strokeWidth={2.5} />
-              {workoutChart.points.map((p, i) => (
-                <circle key={i} cx={p.x} cy={p.y} r={3.5} fill={COLORS.accent} />
-              ))}
+              <ChartPoints
+                points={workoutChart.points}
+                labels={rangeDateLabels}
+                viewBoxWidth={640}
+                color={COLORS.accent}
+                formatValue={(v) => `${v} min`}
+              />
             </svg>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: COLORS.textDim, marginTop: 6 }}>
               <span>{fmtShort(rangeDates[0])}</span>
