@@ -86,7 +86,10 @@ async function ensureSchema(pool: Pool): Promise<void> {
     try {
       await client.query("BEGIN");
       for (const w of seedWeightLog()) {
-        await client.query("INSERT INTO weight_log (date, weight_kg) VALUES ($1, $2)", [w.date, w.weightKg]);
+        await client.query(
+          "INSERT INTO weight_log (date, weight_kg) VALUES ($1, $2) ON CONFLICT (date) DO NOTHING",
+          [w.date, w.weightKg]
+        );
       }
       await client.query("COMMIT");
     } catch (err) {
@@ -97,12 +100,9 @@ async function ensureSchema(pool: Pool): Promise<void> {
     }
   }
 
-  const { rows: settingsRows } = await pool.query("SELECT id FROM settings WHERE id = 1");
-  if (settingsRows.length === 0) {
-    await pool.query(
-      "INSERT INTO settings (id, sex, age, height_cm, weight_kg, activity_level) VALUES (1, 'M', 29, 180, 82.4, 'moderate')"
-    );
-  }
+  await pool.query(
+    "INSERT INTO settings (id, sex, age, height_cm, weight_kg, activity_level) VALUES (1, 'M', 29, 180, 82.4, 'moderate') ON CONFLICT (id) DO NOTHING"
+  );
 }
 
 async function getPool(): Promise<Pool> {
