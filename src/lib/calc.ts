@@ -1,4 +1,4 @@
-import type { ActivityLevel, Meal, Settings, WeightEntry } from "./types";
+import type { ActivityLevel, GoalType, Meal, Settings, WeightEntry } from "./types";
 
 export const MONTHS_SHORT = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -59,6 +59,26 @@ export function todayISO(): string {
   return offsetDate(0);
 }
 
+export const GOAL_LABELS: Record<GoalType, string> = {
+  maintain: "Maintain weight",
+  mild_loss: "Lose weight (mild, ~0.25 kg/week)",
+  loss: "Lose weight (~0.5 kg/week)",
+  mild_gain: "Gain weight (mild, ~0.25 kg/week)",
+  gain: "Gain weight (~0.5 kg/week)",
+};
+
+// A 0.5 kg/week change corresponds to roughly a 500 kcal/day deficit or
+// surplus (0.45 kg of fat ~= 3500 kcal); mild variants use half that.
+const GOAL_ADJUSTMENTS: Record<GoalType, number> = {
+  maintain: 0,
+  mild_loss: -250,
+  loss: -500,
+  mild_gain: 250,
+  gain: 500,
+};
+
+const MIN_CALORIES = 1200;
+
 export type Goals = { calories: number; protein: number; carbs: number; fat: number };
 
 export function computeGoals(settings: Settings): Goals {
@@ -67,12 +87,13 @@ export function computeGoals(settings: Settings): Goals {
       ? 10 * settings.weightKg + 6.25 * settings.heightCm - 5 * settings.age + 5
       : 10 * settings.weightKg + 6.25 * settings.heightCm - 5 * settings.age - 161;
   const factor = ACTIVITY_FACTORS[settings.activityLevel] || 1.2;
-  const tdee = round(bmr * factor);
+  const tdee = round(bmr * factor) + GOAL_ADJUSTMENTS[settings.goal];
+  const calories = Math.max(MIN_CALORIES, tdee);
   return {
-    calories: tdee,
-    protein: round((tdee * 0.3) / 4),
-    carbs: round((tdee * 0.4) / 4),
-    fat: round((tdee * 0.3) / 9),
+    calories,
+    protein: round((calories * 0.3) / 4),
+    carbs: round((calories * 0.4) / 4),
+    fat: round((calories * 0.3) / 9),
   };
 }
 

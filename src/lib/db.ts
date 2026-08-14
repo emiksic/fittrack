@@ -47,8 +47,11 @@ async function ensureSchema(pool: Pool): Promise<void> {
       age INTEGER NOT NULL,
       height_cm INTEGER NOT NULL,
       weight_kg DOUBLE PRECISION NOT NULL,
-      activity_level TEXT NOT NULL
+      activity_level TEXT NOT NULL,
+      goal TEXT NOT NULL DEFAULT 'maintain'
     );
+
+    ALTER TABLE settings ADD COLUMN IF NOT EXISTS goal TEXT NOT NULL DEFAULT 'maintain';
 
     CREATE TABLE IF NOT EXISTS strava_tokens (
       id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -163,6 +166,7 @@ function mapSettingsRow(r: {
   height_cm: number;
   weight_kg: number;
   activity_level: string;
+  goal: string;
 }): Settings {
   return {
     sex: r.sex as Settings["sex"],
@@ -170,13 +174,14 @@ function mapSettingsRow(r: {
     heightCm: r.height_cm,
     weightKg: Number(r.weight_kg),
     activityLevel: r.activity_level as Settings["activityLevel"],
+    goal: r.goal as Settings["goal"],
   };
 }
 
 export async function getSettings(): Promise<Settings> {
   const pool = await getPool();
   const { rows } = await pool.query(
-    "SELECT sex, age, height_cm, weight_kg, activity_level FROM settings WHERE id = 1"
+    "SELECT sex, age, height_cm, weight_kg, activity_level, goal FROM settings WHERE id = 1"
   );
   return mapSettingsRow(rows[0]);
 }
@@ -186,10 +191,10 @@ export async function updateSettings(partial: Partial<Settings>): Promise<Settin
   const current = await getSettings();
   const next: Settings = { ...current, ...partial };
   const { rows } = await pool.query(
-    `UPDATE settings SET sex = $1, age = $2, height_cm = $3, weight_kg = $4, activity_level = $5
+    `UPDATE settings SET sex = $1, age = $2, height_cm = $3, weight_kg = $4, activity_level = $5, goal = $6
      WHERE id = 1
-     RETURNING sex, age, height_cm, weight_kg, activity_level`,
-    [next.sex, next.age, next.heightCm, next.weightKg, next.activityLevel]
+     RETURNING sex, age, height_cm, weight_kg, activity_level, goal`,
+    [next.sex, next.age, next.heightCm, next.weightKg, next.activityLevel, next.goal]
   );
   return mapSettingsRow(rows[0]);
 }

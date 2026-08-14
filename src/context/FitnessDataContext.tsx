@@ -35,6 +35,7 @@ const DEFAULT_SETTINGS: Settings = {
   heightCm: 180,
   weightKg: 82.4,
   activityLevel: "moderate",
+  goal: "maintain",
 };
 
 const DEFAULT_INTEGRATIONS: IntegrationStatus = {

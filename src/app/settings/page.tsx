@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useFitnessData } from "@/context/FitnessDataContext";
 import { COLORS, FONT_DISPLAY } from "@/lib/theme";
-import { computeGoals } from "@/lib/calc";
-import type { ActivityLevel } from "@/lib/types";
+import { computeGoals, GOAL_LABELS } from "@/lib/calc";
+import type { ActivityLevel, GoalType } from "@/lib/types";
 
 const cardStyle: React.CSSProperties = {
   background: COLORS.cardBg,
@@ -86,33 +86,14 @@ export default function SettingsPage() {
               <option value="F">Female</option>
             </select>
           </div>
-          <div>
-            <div style={fieldLabelStyle}>Age (years)</div>
-            <input
-              type="number"
-              value={settings.age}
-              onChange={(e) => updateSettings({ age: Number(e.target.value) || 0 })}
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <div style={fieldLabelStyle}>Height (cm)</div>
-            <input
-              type="number"
-              value={settings.heightCm}
-              onChange={(e) => updateSettings({ heightCm: Number(e.target.value) || 0 })}
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <div style={fieldLabelStyle}>Weight (kg)</div>
-            <input
-              type="number"
-              value={settings.weightKg}
-              onChange={(e) => updateSettings({ weightKg: Number(e.target.value) || 0 })}
-              style={inputStyle}
-            />
-          </div>
+          <NumberField label="Age (years)" value={settings.age} onCommit={(n) => updateSettings({ age: n })} />
+          <NumberField label="Height (cm)" value={settings.heightCm} onCommit={(n) => updateSettings({ heightCm: n })} />
+          <NumberField
+            label="Weight (kg)"
+            value={settings.weightKg}
+            onCommit={(n) => updateSettings({ weightKg: n })}
+            allowDecimal
+          />
           <div>
             <div style={fieldLabelStyle}>Activity level</div>
             <select
@@ -125,6 +106,20 @@ export default function SettingsPage() {
               <option value="moderate">Moderately active (3-5x/week)</option>
               <option value="active">Very active (6-7x/week)</option>
               <option value="very_active">Extremely active</option>
+            </select>
+          </div>
+          <div>
+            <div style={fieldLabelStyle}>Goal</div>
+            <select
+              value={settings.goal}
+              onChange={(e) => updateSettings({ goal: e.target.value as GoalType })}
+              style={inputStyle}
+            >
+              {(Object.entries(GOAL_LABELS) as [GoalType, string][]).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
             </select>
           </div>
           <div
@@ -228,6 +223,46 @@ export default function SettingsPage() {
         </div>
         {syncMessage && <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 14 }}>{syncMessage}</div>}
       </div>
+    </div>
+  );
+}
+
+function NumberField({
+  label,
+  value,
+  onCommit,
+  allowDecimal,
+}: {
+  label: string;
+  value: number;
+  onCommit: (n: number) => void;
+  allowDecimal?: boolean;
+}) {
+  const [text, setText] = useState(String(value));
+  useEffect(() => {
+    setText(String(value));
+  }, [value]);
+
+  const pattern = allowDecimal ? /^\d*\.?\d*$/ : /^\d*$/;
+
+  return (
+    <div>
+      <div style={fieldLabelStyle}>{label}</div>
+      <input
+        type="text"
+        inputMode={allowDecimal ? "decimal" : "numeric"}
+        value={text}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (!pattern.test(v)) return;
+          setText(v);
+          if (v !== "" && v !== ".") onCommit(Number(v));
+        }}
+        onBlur={() => {
+          if (text === "" || text === ".") setText(String(value));
+        }}
+        style={inputStyle}
+      />
     </div>
   );
 }

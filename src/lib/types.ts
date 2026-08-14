@@ -38,12 +38,15 @@ export type ActivityLevel =
   | "active"
   | "very_active";
 
+export type GoalType = "maintain" | "mild_loss" | "loss" | "mild_gain" | "gain";
+
 export type Settings = {
   sex: "M" | "F";
   age: number;
   heightCm: number;
   weightKg: number;
   activityLevel: ActivityLevel;
+  goal: GoalType;
 };
 
 export type NewMealInput = {
