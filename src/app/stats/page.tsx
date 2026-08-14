@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useFitnessData } from "@/context/FitnessDataContext";
 import { COLORS, FONT_DISPLAY, MACRO_COLORS } from "@/lib/theme";
-import { buildLinePath, computeGoals, fmtShort, macroPct, offsetDate, round, sum, weightTrendChart } from "@/lib/calc";
+import { buildLinePath, computeGoals, estimateRunCalories, fmtShort, macroPct, offsetDate, paceLabel, round, sum, weightTrendChart } from "@/lib/calc";
 import MacroBar from "@/components/MacroBar";
 
 const cardStyle: React.CSSProperties = {
@@ -13,7 +13,7 @@ const cardStyle: React.CSSProperties = {
 };
 
 export default function StatsPage() {
-  const { loading, meals, weightLog, settings } = useFitnessData();
+  const { loading, meals, weightLog, settings, runs, workouts } = useFitnessData();
   const [range, setRange] = useState<7 | 30>(7);
 
   if (loading) return <div style={{ color: COLORS.textMuted, padding: "40px 0" }}>Loading…</div>;
@@ -40,6 +40,19 @@ export default function StatsPage() {
 
   const rangeWeights = weightLog.filter((w) => rangeDates.includes(w.date)).sort((a, b) => a.date.localeCompare(b.date));
   const weightChart = weightTrendChart(rangeWeights);
+
+  const rangeRuns = runs.filter((r) => rangeDates.includes(r.date));
+  const totalDistance = round(sum(rangeRuns, "distanceKm") * 10) / 10;
+  const totalRunTime = sum(rangeRuns, "durationMin");
+  const runCalories = rangeRuns.reduce((a, r) => a + estimateRunCalories(r.distanceKm), 0);
+  const dailyDistance = rangeDates.map((d) => sum(runs.filter((r) => r.date === d), "distanceKm"));
+  const distanceChart = buildLinePath(dailyDistance, 640, 190, 10, 20);
+
+  const rangeWorkouts = workouts.filter((w) => rangeDates.includes(w.date));
+  const totalWorkoutTime = sum(rangeWorkouts, "durationMin");
+  const totalSets = rangeWorkouts.reduce((a, w) => a + w.exercises.reduce((b, e) => b + e.sets.length, 0), 0);
+  const dailyWorkoutMin = rangeDates.map((d) => sum(workouts.filter((w) => w.date === d), "durationMin"));
+  const workoutChart = buildLinePath(dailyWorkoutMin, 640, 190, 10, 20);
 
   return (
     <div>
@@ -99,6 +112,75 @@ export default function StatsPage() {
           )}
         </div>
       </div>
+
+      <div style={{ ...cardStyle, padding: 24, marginTop: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#c9c9c9", marginBottom: 14 }}>Running distance over time</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px,1fr))", gap: 14, marginBottom: 18 }}>
+          <StatBlock label="Total distance" value={`${totalDistance} km`} />
+          <StatBlock label="Runs" value={String(rangeRuns.length)} />
+          <StatBlock label="Total time" value={`${totalRunTime} min`} />
+          <StatBlock label="Avg pace" value={paceLabel(totalRunTime, totalDistance)} />
+          <StatBlock label="Calories burned" value={`~${runCalories}`} />
+        </div>
+        {rangeRuns.length > 0 ? (
+          <>
+            <svg viewBox="0 0 640 190" style={{ width: "100%", height: 190, overflow: "visible" }}>
+              <path d={distanceChart.path} fill="none" stroke={COLORS.amber} strokeWidth={2.5} />
+              {distanceChart.points.map((p, i) => (
+                <circle key={i} cx={p.x} cy={p.y} r={3.5} fill={COLORS.amber} />
+              ))}
+            </svg>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: COLORS.textDim, marginTop: 6 }}>
+              <span>{fmtShort(rangeDates[0])}</span>
+              <span>{fmtShort(rangeDates[rangeDates.length - 1])}</span>
+            </div>
+          </>
+        ) : (
+          <div style={{ color: COLORS.textFaint, fontSize: 13, padding: "30px 0", textAlign: "center" }}>
+            No runs in the selected period.
+          </div>
+        )}
+      </div>
+
+      <div style={{ ...cardStyle, padding: 24, marginTop: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#c9c9c9", marginBottom: 14 }}>Workout time over time</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px,1fr))", gap: 14, marginBottom: 18 }}>
+          <StatBlock label="Workouts" value={String(rangeWorkouts.length)} />
+          <StatBlock label="Total time" value={`${totalWorkoutTime} min`} />
+          <StatBlock label="Total sets" value={String(totalSets)} />
+          <StatBlock
+            label="Avg duration"
+            value={rangeWorkouts.length ? `${round(totalWorkoutTime / rangeWorkouts.length)} min` : "-"}
+          />
+        </div>
+        {rangeWorkouts.length > 0 ? (
+          <>
+            <svg viewBox="0 0 640 190" style={{ width: "100%", height: 190, overflow: "visible" }}>
+              <path d={workoutChart.path} fill="none" stroke={COLORS.accent} strokeWidth={2.5} />
+              {workoutChart.points.map((p, i) => (
+                <circle key={i} cx={p.x} cy={p.y} r={3.5} fill={COLORS.accent} />
+              ))}
+            </svg>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: COLORS.textDim, marginTop: 6 }}>
+              <span>{fmtShort(rangeDates[0])}</span>
+              <span>{fmtShort(rangeDates[rangeDates.length - 1])}</span>
+            </div>
+          </>
+        ) : (
+          <div style={{ color: COLORS.textFaint, fontSize: 13, padding: "30px 0", textAlign: "center" }}>
+            No workouts in the selected period.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ background: COLORS.inputBg, borderRadius: 12, padding: "14px 16px" }}>
+      <div style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600 }}>{value}</div>
     </div>
   );
 }

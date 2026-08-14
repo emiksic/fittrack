@@ -35,12 +35,14 @@ export default function RunsPage() {
             }}
           >
             <div>
-              <div style={{ fontSize: 15, fontWeight: 600 }}>{r.distanceKm} km run</div>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>
+                {r.indoor ? `${Math.floor(r.durationMin)} min treadmill run` : `${r.distanceKm} km run`}
+              </div>
               <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 3 }}>{fmtShort(r.date)}</div>
             </div>
             <div style={{ display: "flex", gap: 22, flexWrap: "wrap" }}>
               <Metric label="Time" value={`${Math.floor(r.durationMin)} min`} />
-              <Metric label="Pace" value={paceLabel(r.durationMin, r.distanceKm)} />
+              {!r.indoor && <Metric label="Pace" value={paceLabel(r.durationMin, r.distanceKm)} />}
               <Metric label="Calories" value={`~${estimateRunCalories(r.distanceKm)}`} />
             </div>
           </div>

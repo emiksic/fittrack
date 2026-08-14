@@ -28,6 +28,9 @@ const fieldLabelStyle: React.CSSProperties = { fontSize: 12, color: COLORS.textM
 export default function SettingsPage() {
   const { loading, settings, updateSettings, logWeightToday, integrations, refreshIntegrations } = useFitnessData();
   const [disconnecting, setDisconnecting] = useState(false);
+  const [syncingStrava, setSyncingStrava] = useState(false);
+  const [syncingHevy, setSyncingHevy] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   if (loading) return <div style={{ color: COLORS.textMuted, padding: "40px 0" }}>Loading…</div>;
 
@@ -38,6 +41,26 @@ export default function SettingsPage() {
     await fetch("/api/strava/disconnect", { method: "POST" });
     await refreshIntegrations();
     setDisconnecting(false);
+  };
+
+  const handleSyncStrava = async () => {
+    setSyncingStrava(true);
+    setSyncMessage(null);
+    const res = await fetch("/api/strava/sync", { method: "POST" });
+    const data = await res.json();
+    setSyncMessage(res.ok ? `Strava: synced ${data.synced} runs.` : `Strava sync failed: ${data.error}`);
+    await refreshIntegrations();
+    setSyncingStrava(false);
+  };
+
+  const handleSyncHevy = async () => {
+    setSyncingHevy(true);
+    setSyncMessage(null);
+    const res = await fetch("/api/hevy/sync", { method: "POST" });
+    const data = await res.json();
+    setSyncMessage(res.ok ? `Hevy: synced ${data.synced} workouts.` : `Hevy sync failed: ${data.error}`);
+    await refreshIntegrations();
+    setSyncingHevy(false);
   };
 
   return (
@@ -146,7 +169,14 @@ export default function SettingsPage() {
                   : "Not configured. Set HEVY_API_KEY to pull real workouts; showing mock data."}
               </div>
             </div>
-            <StatusPill ok={integrations.hevy.configured} />
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {integrations.hevy.configured && (
+                <div onClick={syncingHevy ? undefined : handleSyncHevy} style={syncButtonStyle(syncingHevy)}>
+                  {syncingHevy ? "Syncing…" : "Sync all history"}
+                </div>
+              )}
+              <StatusPill ok={integrations.hevy.configured} />
+            </div>
           </div>
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", background: COLORS.inputBg, borderRadius: 12, gap: 12, flexWrap: "wrap" }}>
@@ -169,29 +199,50 @@ export default function SettingsPage() {
               </a>
             )}
             {integrations.strava.connected && (
-              <div
-                onClick={handleDisconnectStrava}
-                style={{
-                  background: COLORS.inputBg,
-                  border: `1px solid ${COLORS.inputBorder}`,
-                  color: "#c9c9c9",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  padding: "9px 16px",
-                  borderRadius: 10,
-                  cursor: disconnecting ? "default" : "pointer",
-                  opacity: disconnecting ? 0.6 : 1,
-                }}
-              >
-                Disconnect
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div onClick={syncingStrava ? undefined : handleSyncStrava} style={syncButtonStyle(syncingStrava)}>
+                  {syncingStrava ? "Syncing…" : "Sync all history"}
+                </div>
+                <div
+                  onClick={handleDisconnectStrava}
+                  style={{
+                    background: COLORS.inputBg,
+                    border: `1px solid ${COLORS.inputBorder}`,
+                    color: "#c9c9c9",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    padding: "9px 16px",
+                    borderRadius: 10,
+                    cursor: disconnecting ? "default" : "pointer",
+                    opacity: disconnecting ? 0.6 : 1,
+                  }}
+                >
+                  Disconnect
+                </div>
               </div>
             )}
             {!integrations.strava.configured && <StatusPill ok={false} />}
           </div>
         </div>
+        {syncMessage && <div style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 14 }}>{syncMessage}</div>}
       </div>
     </div>
   );
+}
+
+function syncButtonStyle(active: boolean): React.CSSProperties {
+  return {
+    background: COLORS.inputBg,
+    border: `1px solid ${COLORS.inputBorder}`,
+    color: "#c9c9c9",
+    fontSize: 13,
+    fontWeight: 600,
+    padding: "9px 16px",
+    borderRadius: 10,
+    cursor: active ? "default" : "pointer",
+    opacity: active ? 0.6 : 1,
+    whiteSpace: "nowrap",
+  };
 }
 
 function IntegrationNotice() {

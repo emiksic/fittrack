@@ -114,6 +114,7 @@ type StravaSummaryActivity = {
   type?: string;
   sport_type?: string;
   start_date_local: string;
+  trainer?: boolean; // true for treadmill / indoor trainer activities
 };
 
 function mapActivity(a: StravaSummaryActivity): Run {
@@ -125,6 +126,7 @@ function mapActivity(a: StravaSummaryActivity): Run {
     distanceKm,
     durationMin,
     source: "strava",
+    indoor: !!a.trainer,
   };
 }
 
@@ -160,4 +162,37 @@ export async function fetchStravaRuns(limit = 10): Promise<Run[] | null> {
 
 export function runCalories(distanceKm: number): number {
   return estimateRunCalories(distanceKm);
+}
+
+// Paginates through the full activity history and returns every run.
+// Used for a one-time "sync all history" import into the database, as
+// opposed to fetchStravaRuns() which only returns the most recent ones
+// for live display.
+export async function fetchAllStravaRuns(): Promise<Run[] | null> {
+  try {
+    const accessToken = await getValidAccessToken();
+    if (!accessToken) return null;
+
+    const perPage = 200;
+    const all: Run[] = [];
+    for (let page = 1; ; page++) {
+      const params = new URLSearchParams({ per_page: String(perPage), page: String(page) });
+      const res = await fetch(`${STRAVA_ACTIVITIES_URL}?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        console.error("Strava API error", res.status, await res.text());
+        break;
+      }
+      const activities = (await res.json()) as StravaSummaryActivity[];
+      if (activities.length === 0) break;
+      all.push(...activities.filter((a) => (a.sport_type || a.type) === "Run").map(mapActivity));
+      if (activities.length < perPage) break;
+    }
+    return all;
+  } catch (err) {
+    console.error("Strava full sync failed", err);
+    return null;
+  }
 }

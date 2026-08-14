@@ -13,6 +13,8 @@ export function isHevyConfigured(): boolean {
 type HevyApiSet = {
   reps?: number | null;
   weight_kg?: number | null;
+  duration_seconds?: number | null;
+  distance_meters?: number | null;
 };
 
 type HevyApiExercise = {
@@ -43,6 +45,8 @@ function mapWorkout(w: HevyApiWorkout): Workout {
     sets: ex.sets.map((s) => ({
       reps: s.reps ?? 0,
       weight: s.weight_kg ?? 0,
+      durationSec: s.duration_seconds ?? undefined,
+      distanceMeters: s.distance_meters ?? undefined,
     })),
   }));
   const date =
@@ -80,6 +84,38 @@ export async function fetchHevyWorkouts(limit = 10): Promise<Workout[] | null> {
     return data.workouts.map(mapWorkout);
   } catch (err) {
     console.error("Hevy API request failed", err);
+    return null;
+  }
+}
+
+// Paginates through the full workout history and returns every workout.
+// Used for a one-time "sync all history" import into the database, as
+// opposed to fetchHevyWorkouts() which only returns the most recent page
+// for live display.
+export async function fetchAllHevyWorkouts(): Promise<Workout[] | null> {
+  const apiKey = process.env.HEVY_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const pageSize = 10; // Hevy API max page size
+    const all: Workout[] = [];
+    for (let page = 1; ; page++) {
+      const res = await fetch(`${HEVY_BASE_URL}/workouts?page=${page}&pageSize=${pageSize}`, {
+        headers: { "api-key": apiKey },
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        console.error("Hevy API error", res.status, await res.text());
+        break;
+      }
+      const data = (await res.json()) as HevyApiWorkoutsResponse;
+      if (data.workouts.length === 0) break;
+      all.push(...data.workouts.map(mapWorkout));
+      if (page >= data.page_count) break;
+    }
+    return all;
+  } catch (err) {
+    console.error("Hevy full sync failed", err);
     return null;
   }
 }

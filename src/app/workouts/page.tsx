@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useFitnessData } from "@/context/FitnessDataContext";
 import { COLORS, FONT_DISPLAY } from "@/lib/theme";
 import { fmtShort } from "@/lib/calc";
-import type { Workout } from "@/lib/types";
+import type { Workout, WorkoutSet } from "@/lib/types";
 
 const cardStyle: React.CSSProperties = {
   background: COLORS.cardBg,
@@ -74,7 +74,7 @@ function WorkoutCard({ workout, isOpen, onToggle }: { workout: Workout; isOpen: 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {ex.sets.map((s, si) => (
                   <div key={si} style={{ fontSize: 12, color: COLORS.chipText, background: COLORS.chipBg, padding: "5px 10px", borderRadius: 8 }}>
-                    Set {si + 1}: {s.reps} × {s.weight === 0 ? "BW" : `${s.weight} kg`}
+                    Set {si + 1}: {formatSetLabel(s)}
                   </div>
                 ))}
               </div>
@@ -84,6 +84,15 @@ function WorkoutCard({ workout, isOpen, onToggle }: { workout: Workout; isOpen: 
       )}
     </div>
   );
+}
+
+function formatSetLabel(s: WorkoutSet): string {
+  if (s.durationSec) {
+    const min = Math.round(s.durationSec / 60);
+    const distanceLabel = s.distanceMeters ? ` · ${(s.distanceMeters / 1000).toFixed(2)} km` : "";
+    return `${min} min${distanceLabel}`;
+  }
+  return `${s.reps} × ${s.weight === 0 ? "BW" : `${s.weight} kg`}`;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useFitnessData } from "@/context/FitnessDataContext";
 import { useAddMealModal } from "@/context/AddMealModalContext";
 import { COLORS, FONT_DISPLAY, MACRO_COLORS } from "@/lib/theme";
@@ -24,10 +25,26 @@ const cardStyle: React.CSSProperties = {
 };
 
 export default function DashboardPage() {
-  const { loading, meals, workouts, runs, settings } = useFitnessData();
+  const { loading, meals, workouts, runs, settings, integrations, refreshIntegrations } = useFitnessData();
   const { open: openAddMeal } = useAddMealModal();
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   if (loading) return <div style={{ color: COLORS.textMuted, padding: "40px 0" }}>Loading…</div>;
+
+  const canSync = integrations.strava.connected || integrations.hevy.configured;
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncMsg(null);
+    const tasks: Promise<{ synced?: number; error?: string }>[] = [];
+    if (integrations.strava.connected) tasks.push(fetch("/api/strava/sync", { method: "POST" }).then((r) => r.json()));
+    if (integrations.hevy.configured) tasks.push(fetch("/api/hevy/sync", { method: "POST" }).then((r) => r.json()));
+    const results = await Promise.all(tasks);
+    await refreshIntegrations();
+    const total = results.reduce((a, r) => a + (r.synced ?? 0), 0);
+    setSyncMsg(`Synced ${total} activities.`);
+    setSyncing(false);
+  };
 
   const today = todayISO();
   const hour = new Date().getHours();
@@ -52,8 +69,9 @@ export default function DashboardPage() {
   ];
 
   const todayWorkouts = workouts.filter((w) => w.date === today);
-  const statBurned = todayWorkouts.length * 300;
-  const statActiveMin = sum(todayWorkouts, "durationMin");
+  const todayRuns = runs.filter((r) => r.date === today);
+  const statBurned = todayWorkouts.length * 300 + sum(todayRuns.map((r) => ({ calories: estimateRunCalories(r.distanceKm) })), "calories");
+  const statActiveMin = sum(todayWorkouts, "durationMin") + sum(todayRuns, "durationMin");
   const statStreak = trackingStreak(meals);
 
   const workoutsSorted = [...workouts].sort((a, b) => b.date.localeCompare(a.date));
@@ -74,19 +92,44 @@ export default function DashboardPage() {
   const lastR = runsSorted[0];
   const lastRun = lastR
     ? {
+        indoor: !!lastR.indoor,
         distanceKm: lastR.distanceKm,
         dateLabel: fmtShort(lastR.date),
         durationLabel: Math.floor(lastR.durationMin) + " min",
         paceLabel: paceLabel(lastR.durationMin, lastR.distanceKm),
         calories: estimateRunCalories(lastR.distanceKm),
       }
-    : { distanceKm: 0, dateLabel: "-", durationLabel: "-", paceLabel: "-", calories: 0 };
+    : { indoor: false, distanceKm: 0, dateLabel: "-", durationLabel: "-", paceLabel: "-", calories: 0 };
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600, color: COLORS.text }}>{greeting}</div>
-        <div style={{ fontSize: 14, color: COLORS.textMuted, marginTop: 4, textTransform: "capitalize" }}>{fmtFull(today)}</div>
+      <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 26, fontWeight: 600, color: COLORS.text }}>{greeting}</div>
+          <div style={{ fontSize: 14, color: COLORS.textMuted, marginTop: 4, textTransform: "capitalize" }}>{fmtFull(today)}</div>
+        </div>
+        {canSync && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+            <div
+              onClick={syncing ? undefined : handleSync}
+              style={{
+                background: COLORS.inputBg,
+                border: `1px solid ${COLORS.inputBorder}`,
+                color: "#c9c9c9",
+                fontSize: 13,
+                fontWeight: 600,
+                padding: "9px 16px",
+                borderRadius: 10,
+                cursor: syncing ? "default" : "pointer",
+                opacity: syncing ? 0.6 : 1,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {syncing ? "Syncing…" : "Sync"}
+            </div>
+            {syncMsg && <div style={{ fontSize: 12, color: COLORS.textMuted }}>{syncMsg}</div>}
+          </div>
+        )}
       </div>
 
       {/* Today summary card */}
@@ -160,11 +203,13 @@ export default function DashboardPage() {
           <div style={{ fontSize: 12, color: COLORS.accent, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 10 }}>
             Last run
           </div>
-          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, marginBottom: 4 }}>{lastRun.distanceKm} km run</div>
+          <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, marginBottom: 4 }}>
+            {lastRun.indoor ? `${lastRun.durationLabel} treadmill run` : `${lastRun.distanceKm} km run`}
+          </div>
           <div style={{ fontSize: 13, color: COLORS.textMuted, marginBottom: 16 }}>{lastRun.dateLabel}</div>
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
             <Metric label="Time" value={lastRun.durationLabel} />
-            <Metric label="Pace" value={lastRun.paceLabel} />
+            {!lastRun.indoor && <Metric label="Pace" value={lastRun.paceLabel} />}
             <Metric label="Calories" value={`~${lastRun.calories}`} />
           </div>
         </div>

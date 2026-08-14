@@ -1,6 +1,6 @@
 import { Pool } from "pg";
-import type { Meal, Settings, WeightEntry } from "./types";
-import { seedMeals, seedWeightLog } from "./seed";
+import type { Meal, Settings, WeightEntry, Run, Workout } from "./types";
+import { seedWeightLog } from "./seed";
 
 declare global {
   var __pgPool: Pool | undefined;
@@ -58,27 +58,27 @@ async function ensureSchema(pool: Pool): Promise<void> {
       athlete_id BIGINT,
       athlete_name TEXT
     );
-  `);
 
-  const { rows: mealCountRows } = await pool.query("SELECT COUNT(*)::int as c FROM meals");
-  if (mealCountRows[0].c === 0) {
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-      for (const m of seedMeals()) {
-        await client.query(
-          "INSERT INTO meals (id, date, time, name, calories, protein, carbs, fat) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-          [m.id, m.date, m.time, m.name, m.calories, m.protein, m.carbs, m.fat]
-        );
-      }
-      await client.query("COMMIT");
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
-    } finally {
-      client.release();
-    }
-  }
+    CREATE TABLE IF NOT EXISTS runs (
+      id TEXT PRIMARY KEY,
+      date TEXT NOT NULL,
+      distance_km DOUBLE PRECISION NOT NULL,
+      duration_min INTEGER NOT NULL,
+      source TEXT NOT NULL,
+      indoor BOOLEAN NOT NULL DEFAULT FALSE
+    );
+
+    ALTER TABLE runs ADD COLUMN IF NOT EXISTS indoor BOOLEAN NOT NULL DEFAULT FALSE;
+
+    CREATE TABLE IF NOT EXISTS workouts (
+      id TEXT PRIMARY KEY,
+      date TEXT NOT NULL,
+      name TEXT NOT NULL,
+      duration_min INTEGER NOT NULL,
+      exercises JSONB NOT NULL,
+      source TEXT NOT NULL
+    );
+  `);
 
   const { rows: weightCountRows } = await pool.query("SELECT COUNT(*)::int as c FROM weight_log");
   if (weightCountRows[0].c === 0) {
@@ -238,4 +238,86 @@ export async function saveStravaTokens(tokens: StravaTokenRow): Promise<void> {
 export async function clearStravaTokens(): Promise<void> {
   const pool = await getPool();
   await pool.query("DELETE FROM strava_tokens WHERE id = 1");
+}
+
+// ---- Runs ----
+
+export async function listRuns(source: string): Promise<Run[]> {
+  const pool = await getPool();
+  const { rows } = await pool.query(
+    "SELECT id, date, distance_km, duration_min, source, indoor FROM runs WHERE source = $1 ORDER BY date DESC",
+    [source]
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    date: r.date,
+    distanceKm: Number(r.distance_km),
+    durationMin: r.duration_min,
+    source: r.source,
+    indoor: r.indoor,
+  }));
+}
+
+export async function upsertRuns(runs: Run[]): Promise<void> {
+  if (runs.length === 0) return;
+  const pool = await getPool();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const r of runs) {
+      await client.query(
+        `INSERT INTO runs (id, date, distance_km, duration_min, source, indoor) VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (id) DO UPDATE SET date = excluded.date, distance_km = excluded.distance_km,
+           duration_min = excluded.duration_min, source = excluded.source, indoor = excluded.indoor`,
+        [r.id, r.date, r.distanceKm, r.durationMin, r.source, !!r.indoor]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ---- Workouts ----
+
+export async function listWorkouts(source: string): Promise<Workout[]> {
+  const pool = await getPool();
+  const { rows } = await pool.query(
+    "SELECT id, date, name, duration_min, exercises, source FROM workouts WHERE source = $1 ORDER BY date DESC",
+    [source]
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    date: r.date,
+    name: r.name,
+    durationMin: r.duration_min,
+    exercises: r.exercises,
+    source: r.source,
+  }));
+}
+
+export async function upsertWorkouts(workouts: Workout[]): Promise<void> {
+  if (workouts.length === 0) return;
+  const pool = await getPool();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const w of workouts) {
+      await client.query(
+        `INSERT INTO workouts (id, date, name, duration_min, exercises, source) VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (id) DO UPDATE SET date = excluded.date, name = excluded.name,
+           duration_min = excluded.duration_min, exercises = excluded.exercises, source = excluded.source`,
+        [w.id, w.date, w.name, w.durationMin, JSON.stringify(w.exercises), w.source]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }

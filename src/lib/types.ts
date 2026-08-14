@@ -9,7 +9,7 @@ export type Meal = {
   fat: number;
 };
 
-export type WorkoutSet = { reps: number; weight: number };
+export type WorkoutSet = { reps: number; weight: number; durationSec?: number; distanceMeters?: number };
 export type WorkoutExercise = { name: string; sets: WorkoutSet[] };
 export type Workout = {
   id: string;
@@ -26,6 +26,7 @@ export type Run = {
   distanceKm: number;
   durationMin: number;
   source: "mock" | "strava";
+  indoor?: boolean;
 };
 
 export type WeightEntry = { date: string; weightKg: number };
