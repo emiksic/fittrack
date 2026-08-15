@@ -17,6 +17,7 @@ import {
 } from "@/lib/calc";
 import CalorieRing from "@/components/CalorieRing";
 import MacroBar from "@/components/MacroBar";
+import type { Meal } from "@/lib/types";
 
 const cardStyle: React.CSSProperties = {
   background: COLORS.cardBg,
@@ -228,10 +229,12 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function MealRow({ meal }: { meal: { id: string; name: string; time: string; protein: number; carbs: number; fat: number; calories: number } }) {
+function MealRow({ meal }: { meal: Meal }) {
   const { removeMeal } = useFitnessData();
+  const { openEdit } = useAddMealModal();
   return (
     <div
+      onClick={() => openEdit(meal)}
       style={{
         display: "flex",
         alignItems: "center",
@@ -239,6 +242,7 @@ function MealRow({ meal }: { meal: { id: string; name: string; time: string; pro
         padding: "14px 20px",
         borderBottom: `1px solid ${COLORS.divider}`,
         gap: 12,
+        cursor: "pointer",
       }}
     >
       <div style={{ minWidth: 0 }}>
@@ -249,7 +253,13 @@ function MealRow({ meal }: { meal: { id: string; name: string; time: string; pro
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.text }}>{meal.calories} kcal</div>
-        <div onClick={() => removeMeal(meal.id)} style={{ color: "#666", cursor: "pointer", fontSize: 13 }}>
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            removeMeal(meal.id);
+          }}
+          style={{ color: "#666", cursor: "pointer", fontSize: 13 }}
+        >
           Remove
         </div>
       </div>

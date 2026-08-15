@@ -3,9 +3,25 @@
 import { useState } from "react";
 import { useFitnessData } from "@/context/FitnessDataContext";
 import { COLORS, FONT_DISPLAY, MACRO_COLORS } from "@/lib/theme";
-import { buildLinePath, computeGoals, estimateRunCalories, fmtShort, macroPct, offsetDate, paceLabel, round, sum, weightTrendChart } from "@/lib/calc";
+import {
+  buildLinePath,
+  computeGoals,
+  estimateRunCalories,
+  fmtShort,
+  macroPct,
+  offsetDate,
+  paceLabel,
+  round,
+  sum,
+  toISO,
+  todayISO,
+  weekRangeLabel,
+  weekStart,
+  weightTrendChart,
+} from "@/lib/calc";
 import MacroBar from "@/components/MacroBar";
 import ChartPoints from "@/components/ChartPoints";
+import ActivityCalendar from "@/components/ActivityCalendar";
 
 const cardStyle: React.CSSProperties = {
   background: COLORS.cardBg,
@@ -15,7 +31,7 @@ const cardStyle: React.CSSProperties = {
 
 export default function StatsPage() {
   const { loading, meals, weightLog, settings, runs, workouts } = useFitnessData();
-  const [range, setRange] = useState<7 | 30>(7);
+  const [range, setRange] = useState<7 | 30>(30);
 
   if (loading) return <div style={{ color: COLORS.textMuted, padding: "40px 0" }}>Loading…</div>;
 
@@ -58,6 +74,26 @@ export default function StatsPage() {
   const dailyWorkoutMin = rangeDates.map((d) => sum(workouts.filter((w) => w.date === d), "durationMin"));
   const workoutChart = buildLinePath(dailyWorkoutMin, 640, 190, 10, 20);
 
+  const WEEKS_TO_SHOW = 8;
+  const thisWeekStart = new Date(weekStart(todayISO()) + "T00:00:00");
+  const weekStarts: string[] = [];
+  for (let i = WEEKS_TO_SHOW - 1; i >= 0; i--) {
+    const d = new Date(thisWeekStart);
+    d.setDate(d.getDate() - i * 7);
+    weekStarts.push(toISO(d));
+  }
+  const weeklyStats = weekStarts.map((ws) => {
+    const end = new Date(ws + "T00:00:00");
+    end.setDate(end.getDate() + 6);
+    const endIso = toISO(end);
+    const inWeek = (d: string) => d >= ws && d <= endIso;
+    return {
+      weekStart: ws,
+      workouts: workouts.filter((w) => inWeek(w.date)).length,
+      runs: runs.filter((r) => inWeek(r.date)).length,
+    };
+  });
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
@@ -65,6 +101,38 @@ export default function StatsPage() {
         <div style={{ display: "flex", gap: 6, background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 4 }}>
           <RangeButton label="7 days" active={range === 7} onClick={() => setRange(7)} />
           <RangeButton label="30 days" active={range === 30} onClick={() => setRange(30)} />
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px,1fr))", gap: 16, marginBottom: 16 }}>
+        <div style={{ ...cardStyle, padding: 24 }}>
+          <ActivityCalendar workouts={workouts} runs={runs} />
+        </div>
+        <div style={{ ...cardStyle, padding: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#c9c9c9", marginBottom: 14 }}>Weekly activity</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {weeklyStats.map((w) => (
+              <div
+                key={w.weekStart}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  background: COLORS.inputBg,
+                  borderRadius: 10,
+                  padding: "9px 14px",
+                }}
+              >
+                <span style={{ fontSize: 12, color: COLORS.textMuted }}>
+                  {w.weekStart === weekStarts[weekStarts.length - 1] ? "This week" : weekRangeLabel(w.weekStart)}
+                </span>
+                <span style={{ fontSize: 12, display: "flex", gap: 14 }}>
+                  <span style={{ color: COLORS.accent, fontWeight: 600 }}>{w.workouts} workouts</span>
+                  <span style={{ color: COLORS.amber, fontWeight: 600 }}>{w.runs} runs</span>
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 

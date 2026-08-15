@@ -115,6 +115,7 @@ type StravaSummaryActivity = {
   sport_type?: string;
   start_date_local: string;
   trainer?: boolean; // true for treadmill / indoor trainer activities
+  map?: { summary_polyline?: string | null } | null;
 };
 
 function mapActivity(a: StravaSummaryActivity): Run {
@@ -127,6 +128,7 @@ function mapActivity(a: StravaSummaryActivity): Run {
     durationMin,
     source: "strava",
     indoor: !!a.trainer,
+    polyline: a.map?.summary_polyline || undefined,
   };
 }
 

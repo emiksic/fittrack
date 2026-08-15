@@ -23,6 +23,7 @@ type FitnessData = {
   settings: Settings;
   integrations: IntegrationStatus;
   addMeal: (input: NewMealInput) => Promise<{ ok: boolean; error?: string }>;
+  updateMeal: (meal: Meal) => Promise<{ ok: boolean; error?: string }>;
   removeMeal: (id: string) => Promise<void>;
   updateSettings: (partial: Partial<Settings>) => Promise<void>;
   logWeightToday: () => Promise<void>;
@@ -100,6 +101,21 @@ export function FitnessDataProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, []);
 
+  const updateMeal = useCallback(async (meal: Meal) => {
+    const res = await fetch("/api/meals", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(meal),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return { ok: false, error: data.error || "Could not update meal." };
+    }
+    const data = await res.json();
+    setMeals((prev) => prev.map((m) => (m.id === data.meal.id ? data.meal : m)));
+    return { ok: true };
+  }, []);
+
   const removeMeal = useCallback(async (id: string) => {
     setMeals((prev) => prev.filter((m) => m.id !== id));
     await fetch(`/api/meals?id=${encodeURIComponent(id)}`, { method: "DELETE" });
@@ -160,6 +176,7 @@ export function FitnessDataProvider({ children }: { children: ReactNode }) {
       settings,
       integrations,
       addMeal,
+      updateMeal,
       removeMeal,
       updateSettings,
       logWeightToday,
@@ -176,6 +193,7 @@ export function FitnessDataProvider({ children }: { children: ReactNode }) {
       settings,
       integrations,
       addMeal,
+      updateMeal,
       removeMeal,
       updateSettings,
       logWeightToday,

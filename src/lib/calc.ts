@@ -59,6 +59,25 @@ export function todayISO(): string {
   return offsetDate(0);
 }
 
+// Monday-start ISO date for the week containing the given date.
+export function weekStart(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1) - day;
+  d.setDate(d.getDate() + diff);
+  return toISO(d);
+}
+
+export function weekRangeLabel(weekStartIso: string): string {
+  const start = new Date(weekStartIso + "T00:00:00");
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const sameMonth = start.getMonth() === end.getMonth();
+  const startLabel = `${MONTHS_SHORT[start.getMonth()]} ${start.getDate()}`;
+  const endLabel = sameMonth ? `${end.getDate()}` : `${MONTHS_SHORT[end.getMonth()]} ${end.getDate()}`;
+  return `${startLabel}–${endLabel}`;
+}
+
 export const GOAL_LABELS: Record<GoalType, string> = {
   maintain: "Maintain weight",
   mild_loss: "Lose weight (mild, ~0.25 kg/week)",

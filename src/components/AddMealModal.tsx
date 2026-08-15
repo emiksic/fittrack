@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAddMealModal } from "@/context/AddMealModalContext";
 import { useFitnessData } from "@/context/FitnessDataContext";
 import { COLORS, FONT_DISPLAY } from "@/lib/theme";
@@ -18,17 +18,64 @@ const inputStyle: React.CSSProperties = {
 };
 
 export default function AddMealModal() {
-  const { isOpen, close } = useAddMealModal();
-  const { addMeal } = useFitnessData();
+  const { isOpen, editingMeal, close } = useAddMealModal();
+  const { addMeal, updateMeal } = useFitnessData();
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState(false);
+  const [description, setDescription] = useState("");
+  const [estimating, setEstimating] = useState(false);
+  const [estimateError, setEstimateError] = useState<string | null>(null);
+  const [aiEstimated, setAiEstimated] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (editingMeal) {
+      setForm({
+        name: editingMeal.name,
+        calories: String(editingMeal.calories),
+        protein: String(editingMeal.protein),
+        carbs: String(editingMeal.carbs),
+        fat: String(editingMeal.fat),
+      });
+    } else {
+      setForm(EMPTY_FORM);
+    }
+    setError(false);
+    setDescription("");
+    setEstimateError(null);
+    setAiEstimated(false);
+  }, [isOpen, editingMeal]);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
     close();
-    setForm(EMPTY_FORM);
-    setError(false);
+  };
+
+  const handleEstimate = async () => {
+    if (!description.trim()) return;
+    setEstimating(true);
+    setEstimateError(null);
+    const res = await fetch("/api/meals/estimate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description: description.trim() }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setEstimateError(data.error || "Could not estimate meal.");
+      setEstimating(false);
+      return;
+    }
+    setForm({
+      name: data.name,
+      calories: String(data.calories),
+      protein: String(data.protein),
+      carbs: String(data.carbs),
+      fat: String(data.fat),
+    });
+    setAiEstimated(true);
+    setEstimating(false);
   };
 
   const handleSubmit = async () => {
@@ -36,13 +83,14 @@ export default function AddMealModal() {
       setError(true);
       return;
     }
-    const result = await addMeal({
+    const payload = {
       name: form.name.trim(),
       calories: Number(form.calories) || 0,
       protein: Number(form.protein) || 0,
       carbs: Number(form.carbs) || 0,
       fat: Number(form.fat) || 0,
-    });
+    };
+    const result = editingMeal ? await updateMeal({ ...editingMeal, ...payload }) : await addMeal(payload);
     if (!result.ok) {
       setError(true);
       return;
@@ -68,7 +116,49 @@ export default function AddMealModal() {
         style={{ background: "#161616", border: `1px solid ${COLORS.inputBorder}`, borderRadius: 20, padding: 28, width: "100%", maxWidth: 420 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, marginBottom: 18 }}>Add meal</div>
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 600, marginBottom: 18 }}>
+          {editingMeal ? "Edit meal" : "Add meal"}
+        </div>
+
+        {!editingMeal && (
+          <>
+            <div style={{ background: COLORS.inputBg, border: `1px solid ${COLORS.inputBorder}`, borderRadius: 12, padding: 14, marginBottom: 18 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#93c5fd", marginBottom: 10 }}>Describe your meal</div>
+              <textarea
+                placeholder="150g piletina, pola tanjura riže"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+                style={{ ...inputStyle, background: "#141414", resize: "none", fontFamily: "inherit" }}
+              />
+              <div
+                onClick={estimating || !description.trim() ? undefined : handleEstimate}
+                style={{
+                  marginTop: 10,
+                  background: COLORS.accent,
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  padding: 10,
+                  borderRadius: 10,
+                  textAlign: "center",
+                  cursor: estimating || !description.trim() ? "default" : "pointer",
+                  opacity: estimating || !description.trim() ? 0.6 : 1,
+                }}
+              >
+                {estimating ? "Thinking…" : "Estimate with AI"}
+              </div>
+              {estimateError && <div style={{ color: COLORS.red, fontSize: 12, marginTop: 8 }}>{estimateError}</div>}
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+              <div style={{ flex: 1, height: 1, background: COLORS.border }} />
+              <div style={{ fontSize: 11, color: COLORS.textFaint }}>or fill in manually</div>
+              <div style={{ flex: 1, height: 1, background: COLORS.border }} />
+            </div>
+          </>
+        )}
+
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <input
             type="text"
@@ -108,6 +198,9 @@ export default function AddMealModal() {
             />
           </div>
         </div>
+        {aiEstimated && (
+          <div style={{ color: COLORS.green, fontSize: 12, marginTop: 10 }}>AI estimated — edit any field if needed.</div>
+        )}
         {error && <div style={{ color: COLORS.red, fontSize: 12, marginTop: 10 }}>Enter a name and calories.</div>}
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
           <div

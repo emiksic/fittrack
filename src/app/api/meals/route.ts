@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listMeals, insertMeal, deleteMeal } from "@/lib/db";
+import { listMeals, insertMeal, updateMeal, deleteMeal } from "@/lib/db";
 import { todayISO, pad2 } from "@/lib/calc";
-import type { NewMealInput } from "@/lib/types";
+import type { Meal, NewMealInput } from "@/lib/types";
 
 export async function GET() {
   return NextResponse.json({ meals: await listMeals() });
@@ -27,6 +27,27 @@ export async function POST(request: NextRequest) {
   };
   await insertMeal(meal);
   return NextResponse.json({ meal }, { status: 201 });
+}
+
+export async function PUT(request: NextRequest) {
+  const body = (await request.json()) as Meal;
+  const name = (body.name || "").trim();
+  const calories = Number(body.calories) || 0;
+  if (!body.id || !name || !calories) {
+    return NextResponse.json({ error: "Enter a name and calories." }, { status: 400 });
+  }
+  const meal: Meal = {
+    id: body.id,
+    date: body.date,
+    time: body.time,
+    name,
+    calories,
+    protein: Number(body.protein) || 0,
+    carbs: Number(body.carbs) || 0,
+    fat: Number(body.fat) || 0,
+  };
+  await updateMeal(meal);
+  return NextResponse.json({ meal });
 }
 
 export async function DELETE(request: NextRequest) {

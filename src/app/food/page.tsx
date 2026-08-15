@@ -97,8 +97,10 @@ function SummaryStat({ label, value, color }: { label: string; value: string; co
 }
 
 function FoodMealRow({ meal, onRemove }: { meal: Meal; onRemove: () => void }) {
+  const { openEdit } = useAddMealModal();
   return (
     <div
+      onClick={() => openEdit(meal)}
       style={{
         display: "flex",
         alignItems: "center",
@@ -106,6 +108,7 @@ function FoodMealRow({ meal, onRemove }: { meal: Meal; onRemove: () => void }) {
         padding: "14px 20px",
         borderBottom: `1px solid ${COLORS.divider}`,
         gap: 12,
+        cursor: "pointer",
       }}
     >
       <div style={{ minWidth: 0 }}>
@@ -116,7 +119,13 @@ function FoodMealRow({ meal, onRemove }: { meal: Meal; onRemove: () => void }) {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>{meal.calories} kcal</div>
-        <div onClick={onRemove} style={{ color: "#666", cursor: "pointer", fontSize: 13 }}>
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          style={{ color: "#666", cursor: "pointer", fontSize: 13 }}
+        >
           Remove
         </div>
       </div>

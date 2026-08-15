@@ -68,8 +68,11 @@ async function ensureSchema(pool: Pool): Promise<void> {
       distance_km DOUBLE PRECISION NOT NULL,
       duration_min INTEGER NOT NULL,
       source TEXT NOT NULL,
-      indoor BOOLEAN NOT NULL DEFAULT FALSE
+      indoor BOOLEAN NOT NULL DEFAULT FALSE,
+      polyline TEXT
     );
+
+    ALTER TABLE runs ADD COLUMN IF NOT EXISTS polyline TEXT;
 
     ALTER TABLE runs ADD COLUMN IF NOT EXISTS indoor BOOLEAN NOT NULL DEFAULT FALSE;
 
@@ -133,6 +136,15 @@ export async function insertMeal(meal: Meal): Promise<void> {
   const pool = await getPool();
   await pool.query(
     "INSERT INTO meals (id, date, time, name, calories, protein, carbs, fat) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+    [meal.id, meal.date, meal.time, meal.name, meal.calories, meal.protein, meal.carbs, meal.fat]
+  );
+}
+
+export async function updateMeal(meal: Meal): Promise<void> {
+  const pool = await getPool();
+  await pool.query(
+    `UPDATE meals SET date = $2, time = $3, name = $4, calories = $5, protein = $6, carbs = $7, fat = $8
+     WHERE id = $1`,
     [meal.id, meal.date, meal.time, meal.name, meal.calories, meal.protein, meal.carbs, meal.fat]
   );
 }
@@ -250,7 +262,7 @@ export async function clearStravaTokens(): Promise<void> {
 export async function listRuns(source: string): Promise<Run[]> {
   const pool = await getPool();
   const { rows } = await pool.query(
-    "SELECT id, date, distance_km, duration_min, source, indoor FROM runs WHERE source = $1 ORDER BY date DESC",
+    "SELECT id, date, distance_km, duration_min, source, indoor, polyline FROM runs WHERE source = $1 ORDER BY date DESC",
     [source]
   );
   return rows.map((r) => ({
@@ -260,6 +272,7 @@ export async function listRuns(source: string): Promise<Run[]> {
     durationMin: r.duration_min,
     source: r.source,
     indoor: r.indoor,
+    polyline: r.polyline ?? undefined,
   }));
 }
 
@@ -271,10 +284,11 @@ export async function upsertRuns(runs: Run[]): Promise<void> {
     await client.query("BEGIN");
     for (const r of runs) {
       await client.query(
-        `INSERT INTO runs (id, date, distance_km, duration_min, source, indoor) VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO runs (id, date, distance_km, duration_min, source, indoor, polyline) VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (id) DO UPDATE SET date = excluded.date, distance_km = excluded.distance_km,
-           duration_min = excluded.duration_min, source = excluded.source, indoor = excluded.indoor`,
-        [r.id, r.date, r.distanceKm, r.durationMin, r.source, !!r.indoor]
+           duration_min = excluded.duration_min, source = excluded.source, indoor = excluded.indoor,
+           polyline = excluded.polyline`,
+        [r.id, r.date, r.distanceKm, r.durationMin, r.source, !!r.indoor, r.polyline ?? null]
       );
     }
     await client.query("COMMIT");

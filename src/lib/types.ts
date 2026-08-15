@@ -27,6 +27,7 @@ export type Run = {
   durationMin: number;
   source: "mock" | "strava";
   indoor?: boolean;
+  polyline?: string;
 };
 
 export type WeightEntry = { date: string; weightKg: number };
